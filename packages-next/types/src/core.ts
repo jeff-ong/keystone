@@ -29,12 +29,6 @@ export type CreateContext = (args: {
   req?: IncomingMessage;
 }) => KeystoneContext;
 
-export type CreateSessionContext<T> = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  createContext: CreateContext
-) => Promise<SessionContext<T>>;
-
 export type AccessControlContext = {
   getListAccessControlForUser: any; // TODO
   getFieldAccessControlForUser: any; // TODO

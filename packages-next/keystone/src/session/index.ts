@@ -6,7 +6,6 @@ import {
   JSONValue,
   SessionStoreFunction,
   CreateContext,
-  CreateSessionContext,
 } from '@keystone-next/types';
 
 // uid-safe is what express-session uses so let's just use it
@@ -176,23 +175,31 @@ export function storedSessions({
   return () => {
     let { get, start, end } = statelessSessions({ ...statelessSessionsOptions, maxAge })();
     let store = typeof storeOption === 'function' ? storeOption({ maxAge }) : storeOption;
+    let isConnected = false;
+    const _connect = async () => {
+      if (!isConnected) {
+        await store.connect?.();
+        isConnected = true;
+      }
+    };
     return {
-      connect: store.connect,
-      disconnect: store.disconnect,
       async get({ req, createContext }) {
         let sessionId = await get({ req, createContext });
         if (typeof sessionId === 'string') {
+          await _connect();
           return store.get(sessionId);
         }
       },
       async start({ res, data, createContext }) {
         let sessionId = generateSessionId();
+        await _connect();
         await store.set(sessionId, data);
         return start?.({ res, data: { sessionId }, createContext }) || '';
       },
       async end({ req, res, createContext }) {
         let sessionId = await get({ req, createContext });
         if (typeof sessionId === 'string') {
+          await _connect();
           await store.delete(sessionId);
         }
         await end?.({ req, res, createContext });
@@ -201,20 +208,17 @@ export function storedSessions({
   };
 }
 
-/**
- * This is the function createSystem uses to implement the session strategy provided
- */
-export function implementSession<T>(sessionStrategy: SessionStrategy<T>): CreateSessionContext<T> {
-  let isConnected = false;
-  return async (req: IncomingMessage, res: ServerResponse, createContext: CreateContext) => {
-    if (!isConnected) {
-      await sessionStrategy.connect?.();
-      isConnected = true;
-    }
-    return {
+export async function createSessionContext<T>(
+  sessionStrategy: SessionStrategy<T> | undefined,
+  req: IncomingMessage,
+  res: ServerResponse,
+  createContext: CreateContext
+) {
+  return (
+    sessionStrategy && {
       session: await sessionStrategy.get({ req, createContext }),
       startSession: (data: T) => sessionStrategy.start({ res, data, createContext }),
       endSession: () => sessionStrategy.end({ req, res, createContext }),
-    };
-  };
+    }
+  );
 }

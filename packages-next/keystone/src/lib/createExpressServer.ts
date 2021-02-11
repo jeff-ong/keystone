@@ -6,20 +6,20 @@ import { ApolloServer } from 'apollo-server-express';
 import { graphqlUploadExpress } from 'graphql-upload';
 // @ts-ignore
 import { formatError } from '@keystonejs/keystone/lib/Keystone/format-error';
-import type { KeystoneConfig, CreateSessionContext, CreateContext } from '@keystone-next/types';
+import type { KeystoneConfig, CreateContext, SessionStrategy } from '@keystone-next/types';
 import { createAdminUIServer } from '@keystone-next/admin-ui/system';
-import { implementSession } from '../session';
+import { createSessionContext } from '../session';
 
 const addApolloServer = ({
   server,
   graphQLSchema,
   createContext,
-  createSessionContext,
+  sessionStrategy,
 }: {
   server: express.Express;
   graphQLSchema: GraphQLSchema;
   createContext: CreateContext;
-  createSessionContext?: CreateSessionContext<any>;
+  sessionStrategy?: SessionStrategy<any>;
 }) => {
   const apolloServer = new ApolloServer({
     uploads: false,
@@ -29,7 +29,7 @@ const addApolloServer = ({
     formatError, // TODO: this needs to be discussed
     context: async ({ req, res }: { req: IncomingMessage; res: ServerResponse }) =>
       createContext({
-        sessionContext: await createSessionContext?.(req, res, createContext),
+        sessionContext: await createSessionContext(sessionStrategy, req, res, createContext),
         req,
       }),
     // FIXME: support for apollo studio tracing
@@ -73,14 +73,14 @@ export const createExpressServer = async (
     server.use(cors(corsConfig));
   }
 
-  const createSessionContext = config.session ? implementSession(config.session()) : undefined;
+  const sessionStrategy = config.session ? config.session() : undefined;
 
   console.log('✨ Preparing GraphQL Server');
-  addApolloServer({ server, graphQLSchema, createContext, createSessionContext });
+  addApolloServer({ server, graphQLSchema, createContext, sessionStrategy });
 
   console.log('✨ Preparing Next.js app');
   server.use(
-    await createAdminUIServer(config.ui, createContext, dev, projectAdminPath, createSessionContext)
+    await createAdminUIServer(config.ui, createContext, dev, projectAdminPath, sessionStrategy)
   );
 
   return server;
