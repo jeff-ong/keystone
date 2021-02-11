@@ -1,14 +1,14 @@
 import url from 'url';
 import next from 'next';
 import express from 'express';
-import type { KeystoneConfig, SessionImplementation, CreateContext } from '@keystone-next/types';
+import type { KeystoneConfig, CreateSessionContext, CreateContext } from '@keystone-next/types';
 
 export const createAdminUIServer = async (
   ui: KeystoneConfig['ui'],
   createContext: CreateContext,
   dev: boolean,
   projectAdminPath: string,
-  sessionImplementation?: SessionImplementation
+  createSessionContext?: CreateSessionContext<any>
 ) => {
   const app = next({ dev, dir: projectAdminPath });
   const handle = app.getRequestHandler();
@@ -22,7 +22,7 @@ export const createAdminUIServer = async (
       return;
     }
     const context = createContext({
-      sessionContext: await sessionImplementation?.createSessionContext(req, res, createContext),
+      sessionContext: await createSessionContext?.(req, res, createContext),
     });
     const isValidSession = ui?.isAccessAllowed
       ? await ui.isAccessAllowed(context)
